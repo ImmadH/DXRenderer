@@ -1,4 +1,5 @@
 #include "win32.h"
+#include "dx12.h"
 
 
 bool InitWindow(HINSTANCE hInstance, int ShowWnd, Application* app)
@@ -58,10 +59,9 @@ LRESULT CALLBACK WndProc(HWND hwnd,
     {
 
     case WM_KEYDOWN:
-        if (wParam == VK_ESCAPE) {
-            if (MessageBox(0, L"Are you sure you want to exit?",
-                L"Really?", MB_YESNO | MB_ICONQUESTION) == IDYES)
-                DestroyWindow(hwnd);
+        if (wParam == VK_ESCAPE) 
+        {
+            DestroyWindow(hwnd);
         }
         return 0;
 
@@ -77,23 +77,24 @@ LRESULT CALLBACK WndProc(HWND hwnd,
 
 
 //GAME LOOP 
-void Run() {
+void Run(Renderer* context) {
     MSG msg;
     ZeroMemory(&msg, sizeof(MSG));
-    
-    while (true)
+
+    while (context->Running)
     {
         if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
         {
             if (msg.message == WM_QUIT)
                 break;
-    
+
             TranslateMessage(&msg);
             DispatchMessage(&msg);
         }
-        else 
+        else
         {
-            
+            Update();
+            Render(context);
         }
     }
 }
