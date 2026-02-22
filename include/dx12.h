@@ -3,6 +3,8 @@
 #include <dxgi1_4.h>
 #include <d3dx12.h>
 #include "win32.h"
+#include <DirectXMath.h>
+
 
 #define SAFE_RELEASE(p) { if ((p)) { (p)->Release(); (p) = nullptr; } }
 
@@ -19,9 +21,20 @@ struct Renderer {
     //HANDLE to event when fence has completed work
     HANDLE fenceEvent;
     UINT64 fenceValue[FRAME_BUFFER_COUNT];
+    //drawing related objects
+    ID3D12PipelineState* pipelineStateObject;
+    ID3D12RootSignature* rootSignature;
+    D3D12_VIEWPORT viewport;
+    D3D12_RECT scissorRect;
+    ID3D12Resource* vertexBuffer;
+    D3D12_VERTEX_BUFFER_VIEW vertexBufferView;
     bool Running = true;
     int frameIndex;
     int rtvDescriptorSize;
+};
+
+struct Vertex {
+    DirectX::XMFLOAT3 pos;
 };
 
 bool InitD3D(Renderer* context, Application* app);
@@ -30,3 +43,4 @@ void Render(Renderer* context);
 void Cleanup(Renderer* context);
 void WaitForPreviousFrame(Renderer* context);
 void UpdatePipeline(Renderer* context);
+bool InitPipeline(Renderer* context, Application* app);

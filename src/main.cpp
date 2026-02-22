@@ -1,11 +1,11 @@
 #ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN             // Exclude rarely-used stuff from Windows headers.
+#define WIN32_LEAN_AND_MEAN            
 #endif
 
 #include "win32.h"
 #include "dx12.h"
-//TODO 
-//init d3d
+
+
 int WINAPI WinMain(HINSTANCE hInstance,    
     HINSTANCE hPrevInstance,
     LPSTR lpCmdLine,
