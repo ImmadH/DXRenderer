@@ -31,7 +31,7 @@ bool InitWindow(HINSTANCE hInstance, int ShowWnd, Application* app)
                             app->windowTitle,
                             WS_OVERLAPPEDWINDOW,
                             CW_USEDEFAULT, CW_USEDEFAULT,
-                            app->WIDTH, app->HEIGHT,
+                            app->width, app->height,
                             NULL, 
                             NULL, 
                             hInstance,

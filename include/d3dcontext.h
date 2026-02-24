@@ -35,3 +35,4 @@ void createDevice(Device *device);
 //Create context and command queue
 void createContext(D3DContext *context, Device *device);
 
+//todo a delete context?
