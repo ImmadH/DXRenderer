@@ -1,5 +1,4 @@
 #include "win32.h"
-#include "dx12.h"
 
 
 bool InitWindow(HINSTANCE hInstance, int ShowWnd, Application* app)
@@ -76,25 +75,5 @@ LRESULT CALLBACK WndProc(HWND hwnd,
 }
 
 
-//GAME LOOP 
-void Run(Renderer* context) {
-    MSG msg;
-    ZeroMemory(&msg, sizeof(MSG));
 
-    while (context->Running)
-    {
-        if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
-        {
-            if (msg.message == WM_QUIT)
-                break;
-
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
-        }
-        else
-        {
-            Update();
-            Render(context);
-        }
-    }
-}
+void Run(Renderer*) {}

@@ -51,7 +51,7 @@ void initSync(Sync *sync, const D3DContext *context)
             throw std::runtime_error("Failed to create fence.");
         }
             
-        sync->fenceValues[i] = 1; 
+        sync->fenceValues[i] = 0;  // FIX: fence is created at 0; start here so first beginFrame wait is a no-op
     }
         
     sync->fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -79,7 +79,7 @@ void beginFrame(Sync *sync)
 {
     const UINT i = sync->frameIndex;
 
-    // Wait until GPU is done with this frame's allocator
+    
     waitForFenceValue(sync->fences[i].Get(), sync->fenceValues[i], sync->fenceEvent);
 
     HRESULT hr = sync->allocators[i]->Reset();
@@ -107,23 +107,22 @@ void endFrame(Sync *sync, const D3DContext *context)
     ID3D12CommandList* lists[] = { sync->commandList.Get() };
     context->queue->ExecuteCommandLists(1, lists);
 
-    //Signal fence for this frame
-    const uint64_t signalValue = sync->fenceValues[i];
+    const uint64_t signalValue = sync->fenceValues[i] + 1;
     hr = context->queue->Signal(sync->fences[i].Get(), signalValue);
     if (FAILED(hr))
     {
         throw std::runtime_error("Failed to signal fence.");
     }
 
-
-    sync->fenceValues[i] = signalValue + 1;
+    sync->fenceValues[i] = signalValue;
 }
 
 void flushGPU(Sync *sync, const D3DContext *context)
 {
     for (UINT i = 0; i < Sync::FrameCount; ++i)
     {
-        const uint64_t signalValue = sync->fenceValues[i];
+        
+        const uint64_t signalValue = sync->fenceValues[i] + 1;
 
         HRESULT hr = context->queue->Signal(sync->fences[i].Get(), signalValue);
         if (FAILED(hr))
@@ -131,6 +130,6 @@ void flushGPU(Sync *sync, const D3DContext *context)
 
         waitForFenceValue(sync->fences[i].Get(), signalValue, sync->fenceEvent);
 
-        sync->fenceValues[i] = signalValue + 1;
+        sync->fenceValues[i] = signalValue;
     }
 }

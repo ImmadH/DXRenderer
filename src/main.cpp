@@ -1,36 +1,73 @@
 #ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN            
+#define WIN32_LEAN_AND_MEAN
 #endif
 
-#include "win32.h"
-#include "dx12.h"
+#include "win32.h"      
+#include "Renderer.h"   
+#include <stdexcept>
 
 
-int WINAPI WinMain(HINSTANCE hInstance,    
-    HINSTANCE hPrevInstance,
-    LPSTR lpCmdLine,
-    int nShowCmd)
+int WINAPI WinMain(HINSTANCE hInstance,
+                   HINSTANCE,
+                   LPSTR,
+                   int        nShowCmd)
 {
+    
     Application app;
+    app.windowName  = L"DXRenderer";
+    app.windowTitle = L"DXRenderer";
+    app.width       = 1920;
+    app.height      = 1080;
+    app.fullScreen  = false;
+
     if (!InitWindow(hInstance, nShowCmd, &app))
     {
-        MessageBox(0, L"Window Init FAILED", L"Error", MB_OK);
-        return 0;
-    }
-    Renderer context;
-    if (!InitD3D(&context, &app))
-    {
-        MessageBox(0, L"Failed to initialize direct3d 12",
-            L"Error", MB_OK);
-        Cleanup(&context);
+        MessageBoxW(nullptr, L"Window initialisation failed.", L"Error",
+                    MB_OK | MB_ICONERROR);
         return 1;
     }
 
+    
+    Renderer renderer = {};
+    try
+    {
+        initRenderer(&renderer, &app);
+    }
+    catch (const std::exception& e)
+    {
+        MessageBoxA(nullptr, e.what(), "Renderer init failed",
+                    MB_OK | MB_ICONERROR);
+        return 1;
+    }
 
-    Run(&context);
-    WaitForPreviousFrame(&context);
-    CloseHandle(context.fenceEvent);
-    Cleanup(&context);
+    
+    MSG msg = {};
+    while (renderer.running)
+    {
+        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE))
+        {
+            if (msg.message == WM_QUIT)
+                renderer.running = false;
 
+            TranslateMessage(&msg);
+            DispatchMessage(&msg);
+        }
+        else
+        {
+            try
+            {
+                renderFrame(&renderer);
+            }
+            catch (const std::exception& e)
+            {
+                MessageBoxA(nullptr, e.what(), "Render error",
+                            MB_OK | MB_ICONERROR);
+                renderer.running = false;
+            }
+        }
+    }
+
+   
+    shutdownRenderer(&renderer);
     return 0;
 }
