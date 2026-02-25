@@ -1,6 +1,6 @@
 #include "Renderer.h"
 #include <stdexcept>
-
+#include "theme.h"
 
 static const Vertex kVerts[] =
 {
@@ -22,7 +22,7 @@ static const D3D12_INPUT_ELEMENT_DESC kInputLayout[] =
 
 void initRenderer(Renderer* renderer, Application* app)
 {
-
+    renderer->app = app;
     createDevice(&renderer->device);
 
 
@@ -77,6 +77,33 @@ void initRenderer(Renderer* renderer, Application* app)
     pipeDesc.rtvFormat            = DXGI_FORMAT_R8G8B8A8_UNORM;
     createPipeline(&renderer->pipeline, &renderer->context, pipeDesc);
 
+    //IMGUI
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+    heapDesc.Type           = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+    heapDesc.NumDescriptors = 1;
+    heapDesc.Flags          = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+    renderer->device.d3d12Device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&renderer->imguiSrvHeap));
+
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGui::StyleColorsDark();
+    applyOrangeTheme();
+    ImGui::GetIO().FontGlobalScale = 2.0f;
+
+    ImGui_ImplWin32_Init(app->hwnd);
+
+    ImGui_ImplDX12_InitInfo initInfo = {};
+    initInfo.Device             = renderer->device.d3d12Device.Get();
+    initInfo.CommandQueue       = renderer->context.queue.Get();
+    initInfo.NumFramesInFlight  = SwapChain::BufferCount;
+    initInfo.RTVFormat          = DXGI_FORMAT_R8G8B8A8_UNORM;
+    initInfo.DSVFormat          = DXGI_FORMAT_UNKNOWN;
+    initInfo.SrvDescriptorHeap  = renderer->imguiSrvHeap.Get();
+    initInfo.SrvDescriptorAllocFn = nullptr;
+    initInfo.SrvDescriptorFreeFn  = nullptr;
+    initInfo.LegacySingleSrvCpuDescriptor = renderer->imguiSrvHeap->GetCPUDescriptorHandleForHeapStart();
+    initInfo.LegacySingleSrvGpuDescriptor = renderer->imguiSrvHeap->GetGPUDescriptorHandleForHeapStart();
+    ImGui_ImplDX12_Init(&initInfo);
     
     renderer->viewport.TopLeftX = 0.0f;
     renderer->viewport.TopLeftY = 0.0f;
@@ -95,16 +122,16 @@ void initRenderer(Renderer* renderer, Application* app)
 static void recordCommands(Renderer* renderer)
 {
     ID3D12GraphicsCommandList* cmd = renderer->sync.commandList.Get();
-    ID3D12Resource*            bb  = getCurrentBackBuffer(&renderer->swapChain);
+    ID3D12Resource* bb  = getCurrentBackBuffer(&renderer->swapChain);
     D3D12_CPU_DESCRIPTOR_HANDLE rtv = getCurrentRTV(&renderer->swapChain);
 
     
     D3D12_RESOURCE_BARRIER toRT = {};
-    toRT.Type                        = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-    toRT.Transition.pResource        = bb;
-    toRT.Transition.StateBefore      = D3D12_RESOURCE_STATE_PRESENT;
-    toRT.Transition.StateAfter       = D3D12_RESOURCE_STATE_RENDER_TARGET;
-    toRT.Transition.Subresource      = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+    toRT.Type  = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    toRT.Transition.pResource = bb;
+    toRT.Transition.StateBefore  = D3D12_RESOURCE_STATE_PRESENT;
+    toRT.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+    toRT.Transition.Subresource  = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
     cmd->ResourceBarrier(1, &toRT);
 
    
@@ -127,6 +154,22 @@ static void recordCommands(Renderer* renderer)
     bindMesh(&renderer->mesh, cmd);
     cmd->DrawInstanced(renderer->mesh.vertexCount, 1, 0, 0);
 
+    //IMGUI
+    ImGui_ImplDX12_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::Begin("DXRenderer");
+    if (ImGui::Checkbox("Fullscreen", &renderer->app->fullScreen))
+        toggleFullscreen(renderer->app);
+    ImGui::End();
+
+    ImGui::Render();
+
+    ID3D12DescriptorHeap* heaps[] = { renderer->imguiSrvHeap.Get() };
+    cmd->SetDescriptorHeaps(1, heaps);
+    ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), cmd);
+
     
     D3D12_RESOURCE_BARRIER toPresent = {};
     toPresent.Type                        = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -140,6 +183,24 @@ static void recordCommands(Renderer* renderer)
 
 void renderFrame(Renderer* renderer)
 {
+    if (renderer->pendingResize)
+    {
+        flushGPU(&renderer->sync, &renderer->context);
+        ImGui_ImplDX12_InvalidateDeviceObjects();
+
+        resizeSwapChain(&renderer->swapChain, &renderer->context,
+                        renderer->pendingWidth, renderer->pendingHeight);
+
+        renderer->viewport.Width = (float)renderer->pendingWidth;
+        renderer->viewport.Height = (float)renderer->pendingHeight;
+        renderer->scissorRect.right  = (LONG)renderer->pendingWidth;
+        renderer->scissorRect.bottom = (LONG)renderer->pendingHeight;
+        renderer->app->width  = (int)renderer->pendingWidth;
+        renderer->app->height = (int)renderer->pendingHeight;
+
+        ImGui_ImplDX12_CreateDeviceObjects();
+        renderer->pendingResize = false;
+    }
     
     acquireNextImage(&renderer->swapChain);
 
@@ -160,6 +221,11 @@ void renderFrame(Renderer* renderer)
 void shutdownRenderer(Renderer* renderer)
 {
     flushGPU(&renderer->sync, &renderer->context);
+    
+    ImGui_ImplDX12_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+    ImGui::DestroyContext();
+    renderer->imguiSrvHeap.Reset();
 
     destroyMesh(&renderer->mesh);
 

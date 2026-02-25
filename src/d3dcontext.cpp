@@ -20,7 +20,7 @@ void createDevice(Device *device)
             break;
         }
 
-        // Skip the software (WARP) adapter
+        
         DXGI_ADAPTER_DESC1 adapterDesc{};
         adapter->GetDesc1(&adapterDesc);
 
@@ -40,7 +40,7 @@ void createDevice(Device *device)
     }
 
     if (!device->d3d12Device)
-        throw std::runtime_error("No D3D12-capable adapter found.");
+        throw std::runtime_error("No D3D12 capable adapter found.");
 }
 
 void createContext(D3DContext *context, Device *device)
